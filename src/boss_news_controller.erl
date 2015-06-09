@@ -63,7 +63,7 @@ start_link() ->
     start_link([]).
 
 start_link(Args) ->
-    gen_server:start_link({global, boss_news}, ?MODULE, Args, []).
+    gen_server:start_link({local, boss_news}, ?MODULE, Args, []).
 
 init(_Options) ->
     {ok, #state{}}.

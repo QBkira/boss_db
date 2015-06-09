@@ -42,7 +42,7 @@ watch(TopicString, CallBack, UserInfo) ->
 %% @doc Same as `watch/3', except that the watch expires after `TTL' seconds.
 %% @spec watch( TopicString :: string(), CallBack, UserInfo, TTL) -> {ok, WatchId} | {error, Reason}
 watch(TopicString, CallBack, UserInfo, TTL) ->
-    gen_server:call({global, ?MODULE}, {watch, TopicString, CallBack, UserInfo, TTL}).
+    gen_server:call(?MODULE, {watch, TopicString, CallBack, UserInfo, TTL}).
 
 %% @doc Create or replace a watch with `WatchId'.
 %% @spec set_watch( WatchId, TopicString::string(), CallBack ) -> ok | {error, Reason}
@@ -57,29 +57,29 @@ set_watch(WatchId, TopicString, CallBack, UserInfo) ->
 %% @doc Same as `set_watch/4', except that the watch expires after `TTL' seconds.
 %% @spec set_watch( WatchId, TopicString::string(), CallBack, UserInfo, TTL ) -> ok | {error, Reason}
 set_watch(WatchId, TopicString, CallBack, UserInfo, TTL) ->
-    gen_server:call({global, ?MODULE}, {set_watch, WatchId, TopicString, CallBack, UserInfo, TTL}).
+    gen_server:call(?MODULE, {set_watch, WatchId, TopicString, CallBack, UserInfo, TTL}).
 
 %% @doc Cancel an existing watch identified by `WatchId'.
 %% @spec cancel_watch( WatchId ) -> ok | {error, Reason}
 cancel_watch(WatchId) ->
-    gen_server:call({global, ?MODULE}, {cancel_watch, WatchId}).
+    gen_server:call(?MODULE, {cancel_watch, WatchId}).
 
 %% @doc Extend an existing watch by the time-to-live specified at creation time.
 %% @spec extend_watch( WatchId ) -> ok | {error, Reason}
 extend_watch(WatchId) ->
-    gen_server:call({global, ?MODULE}, {extend_watch, WatchId}).
+    gen_server:call(?MODULE, {extend_watch, WatchId}).
 
 deleted(Id, Attrs) ->
-    gen_server:call({global, ?MODULE}, {deleted, Id, Attrs}).
+    gen_server:call(?MODULE, {deleted, Id, Attrs}).
 
 updated(Id, OldAttrs, NewAttrs) ->
-    gen_server:call({global, ?MODULE}, {updated, Id, OldAttrs, NewAttrs}).
+    gen_server:call(?MODULE, {updated, Id, OldAttrs, NewAttrs}).
 
 created(Id, NewAttrs) ->
-    gen_server:call({global, ?MODULE}, {created, Id, NewAttrs}).
+    gen_server:call(?MODULE, {created, Id, NewAttrs}).
 
 reset() ->
-    gen_server:call({global, ?MODULE}, reset).
+    gen_server:call(?MODULE, reset).
 
 dump() ->
-    gen_server:call({global, ?MODULE}, dump).
+    gen_server:call(?MODULE, dump).
