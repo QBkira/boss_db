@@ -157,6 +157,9 @@ handle_call({delete, Id}, _From, State) ->
     {Adapter, _, Conn} = db_for_key(Id, State),
     {reply, Adapter:delete(Conn, Id), State};
 
+handle_call({save_record, Record}, _From, #state{ cache_enable = true, cache_prefix = Prefix } = State) ->
+    boss_cache:set(Prefix, Record:id(), Record, State#state.cache_ttl),
+    handle_call({save_record, Record}, _From, State#state{ cache_enable = false });
 handle_call({save_record, Record}, _From, State) ->
     {Adapter, _, Conn} = db_for_record(Record, State),
     {reply, Adapter:save_record(Conn, Record), State};
