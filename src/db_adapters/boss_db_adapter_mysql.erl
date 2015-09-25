@@ -483,7 +483,7 @@ pack_value(false) ->
     "FALSE".
 
 fetch(Pid, Query) ->
-    lager:info("Query ~s", [Query]),
+    % lager:info("Query ~s", [Query]),
     Res = mysql_conn:fetch(Pid, [Query], self()),
 	case Res of
 		{error, MysqlRes} ->
