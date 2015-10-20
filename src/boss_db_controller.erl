@@ -315,7 +315,7 @@ find_list(Type, Include, Cmd, From, Prefix, State, Key) ->
             boss_cache:set(Prefix, Key, Res, State#state.cache_ttl),
             WatchString         = lists:concat([inflector:pluralize(atom_to_list(Type)), 
 						", ", Type, "-*.*"]),
-            boss_news:set_watch(Key, WatchString, fun boss_db_cache:handle_collection_news/3,
+            boss_news:set_watch(Key, WatchString, fun boss_db_cache:handle_record_news/3,
 				{Prefix, Key}, State#state.cache_ttl);
         _ -> error % log it here?
     end,
