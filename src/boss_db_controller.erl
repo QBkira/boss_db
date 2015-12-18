@@ -125,11 +125,11 @@ handle_call({find_by_sql, Type, Sql, Parameters}, _From, State) ->
     {Adapter, Conn, _} = db_for_type(Type, State),
     {reply, Adapter:find_by_sql(Conn, Type, Sql, Parameters), State};
 
-handle_call({get_migrations_table}, _From, #state{ cache_enable = false } = State) ->
+handle_call({get_migrations_table}, _From, State) ->
     {Adapter, Conn} = {State#state.adapter, State#state.read_connection},
     {reply, Adapter:get_migrations_table(Conn), State};
 
-handle_call({migration_done, Tag, Direction}, _From, #state{ cache_enable = false } = State) ->
+handle_call({migration_done, Tag, Direction}, _From, State) ->
     {Adapter, Conn} = {State#state.adapter, State#state.write_connection},
     {reply, Adapter:migration_done(Conn, Tag, Direction), State};
 

@@ -115,7 +115,7 @@ migrate(Migrations) when is_list(Migrations) ->
     %% 2. Get all the current migrations from it.
     DoneMigrations    = db_call({get_migrations_table}),
     DoneMigrationTags = [binary_to_atom(Tag, 'utf8') ||
-                            {_Id, Tag, _MigratedAt} <- DoneMigrations],
+                            [_Id, Tag, _MigratedAt] <- DoneMigrations],
     %% 3. Run the ones that are not in this list.
     transaction(fun() ->
                     [migrate({Tag, Fun}, up) ||
@@ -125,9 +125,9 @@ migrate(Migrations) when is_list(Migrations) ->
 
 create_migration_table_if_needed() ->
     %% 1. Do we have a migrations table?  If not, create it.
-    case table_exists(schema_migrations) of
-        false ->
-            ok = create_table(schema_migrations, [{id, auto_increment, []},
+    case table_exists("schema_migrations") of
+        {error, _} ->
+            ok = create_table("schema_migrations", [{id, auto_increment, []},
                                                   {version, string, [not_null]},
                                                   {migrated_at, datetime, []}]);
         _ ->
