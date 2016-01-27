@@ -203,7 +203,7 @@ sort_order(Options) ->
 %% @spec find_first( Type::atom() ) -> Record | undefined
 %% @doc Query for the first BossRecord of type `Type'.
 find_first(Type) ->
-    return_one(find(Type, [], [{limit, 1}])).
+    find_first(Type, []).
 
 %% @spec find_first( Type::atom(), Conditions ) -> Record | undefined
 %% @doc Query for the first BossRecord of type `Type' matching all of the given `Conditions'
