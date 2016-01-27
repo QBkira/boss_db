@@ -269,7 +269,6 @@ handle_info({'EXIT', _From, _Reason}, State) ->
 handle_info(_Info, State) ->
     {noreply, State}.
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 find_by_key(Key, From, Prefix, State, _CachedValue = undefined) ->
     {reply, Res, _} = handle_call({find, Key}, From, State#state{ cache_enable = false }),
@@ -277,14 +276,14 @@ find_by_key(Key, From, Prefix, State, _CachedValue = undefined) ->
     case IsSuccess of
 	true ->
 	    boss_cache:set(Prefix, Key, Res, State#state.cache_ttl),
-	    WatchString = lists:concat([Key, ", ", Key, ".*"]), 
-	    boss_news:set_watch(Key, WatchString, 
-				fun boss_db_cache:handle_record_news/3, 
-				{Prefix, Key}, 
+	    WatchString = lists:concat([Key, ", ", Key, ".*"]),
+      boss_news:set_watch(Key, WatchString,
+				fun boss_db_cache:handle_record_news/3,
+				{Prefix, Key},
 				State#state.cache_ttl);
 	false ->
 	    lager:error("Find in Cache by key error ~p ~p ", [Key, Res]),
-	    error 
+	    error
     end,
     {reply, Res, State};
 find_by_key(Key, _From, _Prefix, State, CachedValue) ->
@@ -313,9 +312,9 @@ find_list(Type, Include, Cmd, From, Prefix, State, Key) ->
                         boss_cache:set(Prefix, Rec:id(), Rec, State#state.cache_ttl)
                       end, IncludedRecords),
             boss_cache:set(Prefix, Key, Res, State#state.cache_ttl),
-            WatchString         = lists:concat([inflector:pluralize(atom_to_list(Type)), 
+            WatchString         = lists:concat([inflector:pluralize(atom_to_list(Type)),
 						", ", Type, "-*.*"]),
-            boss_news:set_watch(Key, WatchString, fun boss_db_cache:handle_record_news/3,
+            boss_news:set_watch(Key, WatchString, fun boss_db_cache:handle_collection_news/3,
 				{Prefix, Key}, State#state.cache_ttl);
         _ -> error % log it here?
     end,

@@ -38,7 +38,6 @@
 -spec terminate(_,_)        -> 'ok'.
 -spec code_change(_,_,_)    -> {'ok',_}.
 -spec handle_info(_,_)      -> {'noreply',_}.
--spec future_time(non_neg_integer()) -> non_neg_integer().
 -spec activate_record(binary() | maybe_improper_list(binary() | maybe_improper_list(any(),binary() | []) | char(),binary() | []),_) -> any().
 
 -export([start_link/0, start_link/1]).
@@ -47,7 +46,6 @@
 
 -export([activate_record/2]).
 
--export([future_time/1]).
 -spec make_wildcard_watchers(#state{watch_dict::dict(),
                                     ttl_tree::gb_tree(),
                                     set_watchers::dict(),
@@ -84,8 +82,8 @@ handle_call({watch, TopicString, CallBack, UserInfo, TTL}, From, State0 = #state
             {reply, Other, State0}
     end;
 handle_call({set_watch, WatchId, TopicString, CallBack, UserInfo, TTL}, From, State0) ->
-    {reply, _, State} = handle_call({cancel_watch, WatchId}, From, State0),
-    ExpTime = future_time(TTL),
+    {_, State} = boss_news_controller_util:cancel_watch(WatchId, State0),
+    ExpTime = boss_news_controller_util:future_time(TTL),
     {RetVal, NewState, WatchList} = lists:foldr(fun
             (SingleTopic, {ok, StateAcc, WatchListAcc}) ->
                 case re:split(SingleTopic, "\\.", [{return, list}]) of
@@ -94,7 +92,8 @@ handle_call({set_watch, WatchId, TopicString, CallBack, UserInfo, TTL}, From, St
                         {NewState1, WatchInfo} = case IdNum of
                             "*" ->
                                 SetAttrWatchers = case dict:find(Module, StateAcc#state.set_attr_watchers) of
-                                    {ok, Val} -> Val;
+                                    {ok, Val} ->
+                                      Val;
                                     _ -> []
                                 end,
                                 {StateAcc#state{
@@ -147,29 +146,10 @@ handle_call({set_watch, WatchId, TopicString, CallBack, UserInfo, TTL}, From, St
         Error -> {reply, Error, State}
     end;
 handle_call({cancel_watch, WatchId}, _From, State) ->
-    {RetVal, NewState} = case dict:find(WatchId, State#state.watch_dict) of
-        {ok, #watch{ exp_time = ExpTime }} ->
-            NewTree = tiny_pq:move_value(ExpTime, 0, WatchId, State#state.ttl_tree),
-            {ok, State#state{ ttl_tree = NewTree }};
-        _ ->
-            {{error, not_found}, State}
-    end,
-    {reply, RetVal, boss_news_controller_util:prune_expired_entries(NewState)};
-handle_call({extend_watch, WatchId}, _From, State0) ->
-    State = boss_news_controller_util:prune_expired_entries(State0),
-    WatchF = dict:find(WatchId, State#state.watch_dict),
-    {RetVal, NewState} = case WatchF of
-        {ok, #watch{ exp_time = ExpTime, ttl = TTL } = Watch} ->
-            NewExpTime = future_time(TTL),
-            NewTree    = tiny_pq:move_value(ExpTime, NewExpTime, WatchId, State#state.ttl_tree),
-            {ok, State#state{
-                   ttl_tree   = NewTree, 
-                   watch_dict = dict:store(WatchId,
-                                            Watch#watch{ exp_time = NewExpTime }, 
-                                            State#state.watch_dict) }};
-        _ ->
-            {{error, not_found}, State}
-    end,
+    {RetVal, NewState} = boss_news_controller_util:cancel_watch(WatchId, State),
+    {reply, RetVal, NewState};
+handle_call({extend_watch, WatchId}, _From, State) ->
+    {RetVal, NewState} = boss_news_controller_util:extend_watch(WatchId, State),
     {reply, RetVal, NewState};
 handle_call({created, Id, Attrs}, _From, State0) ->
     State                = boss_news_controller_util:prune_expired_entries(State0),
@@ -235,10 +215,6 @@ code_change(_OldVsn, State, _Extra) ->
 handle_info(_Info, State) ->
     {noreply, State}.
 
-
-future_time(TTL) ->
-    {MegaSecs, Secs, _} = erlang:now(),
-    MegaSecs * 1000 * 1000 + Secs + TTL.
 
 activate_record(Id, Attrs) ->
     [Module | _IdNum]   = re:split(Id, "-", [{return, list}, {parts, 2}]),

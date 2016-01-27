@@ -4,7 +4,7 @@
 -compile(export_all).
 -endif.
 
--export([execute_callback/5]).
+-export([execute_callback/6]).
 
 -export([process_dict/3]).
 
@@ -17,23 +17,27 @@
 -export([process_news_state/3]).
 
 -export([prune_expired_entries/1]).
+
+-export([cancel_watch/2, extend_watch/2, future_time/1]).
+
 -include("boss_news.hrl").
--spec execute_callback(news_callback(),event(),event_info(),user_info(),_) -> pid().
+-spec execute_callback(news_callback(),event(),event_info(),user_info(),_,term()) -> term().
 -spec execute_fun(news_callback(),event(),event_info(),user_info()) -> any().
+-spec future_time(non_neg_integer()) -> non_neg_integer().
 
 
-execute_callback(Fun, Event, EventInfo, UserInfo, WatchId) when is_function(Fun) ->
-    erlang:spawn(fun() ->
-			 Result = execute_fun(Fun, Event, EventInfo, UserInfo),
-			 case Result of
-			     {ok, cancel_watch} -> 
-				 boss_news:cancel_watch(WatchId);
-			     {ok, extend_watch} -> 
-				 boss_news:extend_watch(WatchId);
-			     _ ->
-                        ok
-			 end
-		 end).
+execute_callback(Fun, Event, EventInfo, UserInfo, WatchId, State) when is_function(Fun) ->
+  Result = execute_fun(Fun, Event, EventInfo, UserInfo),
+  case Result of
+    {ok, cancel_watch} ->
+      {_, NewState} = boss_news_controller_util:cancel_watch(WatchId, State),
+      NewState;
+    {ok, extend_watch} ->
+      {_, NewState} = boss_news_controller_util:extend_watch(WatchId, State),
+      NewState;
+    _ ->
+      State
+  end.
 
 
 execute_fun(Fun, Event, EventInfo, UserInfo) ->
@@ -81,8 +85,7 @@ created_news_process_inner_1(State, PluralModel, SetWatchers, Record) ->
 created_news_process_inner_2(PluralModel, Record, WatchId, Acc0,
 			     WatchList, CallBack, UserInfo) ->
     lists:foldr(fun({set, TopicString}, Acc1) when TopicString =:= PluralModel ->
-			execute_callback(CallBack, created, Record, UserInfo, WatchId),
-			Acc1;
+			execute_callback(CallBack, created, Record, UserInfo, WatchId, Acc1);
 		   (_, Acc1) ->
                         Acc1
                 end, Acc0, WatchList).
@@ -118,11 +121,9 @@ delete_news_watchers_inner_1(Id, PluralModel, Record, WatchId, Acc0,
 			     WatchList, CallBack, UserInfo) ->
     lists:foldr(fun
 		    ({set, TopicString}, Acc1) when TopicString =:= PluralModel ->
-			execute_callback(CallBack, deleted, Record, UserInfo, WatchId),
-			Acc1;
+			execute_callback(CallBack, deleted, Record, UserInfo, WatchId, Acc1);
 		    ({id, TopicString}, Acc1) when TopicString =:= Id ->
-			execute_callback(CallBack, deleted, Record, UserInfo, WatchId),
-			Acc1;
+			execute_callback(CallBack, deleted, Record, UserInfo, WatchId, Acc1);
                     (_, Acc1) ->
                         Acc1
                 end, Acc0, WatchList).
@@ -173,17 +174,13 @@ news_update_controller_inner_3(Id, Module, NewRecord, Key, OldVal,
                                CallBack, UserInfo) ->
     lists:foldr(fun
 		    ({id_attr, ThisId, Attr}, Acc2) when ThisId =:= Id, Attr =:= KeyString ->
-                execute_callback(CallBack, updated, {NewRecord, Key, OldVal, NewVal}, UserInfo, WatchId),
-                Acc2;
+                execute_callback(CallBack, updated, {NewRecord, Key, OldVal, NewVal}, UserInfo, WatchId, Acc2);
             ({id_attr, ThisId, "*"}, Acc2) when ThisId =:= Id ->
-                                execute_callback(CallBack, updated, {NewRecord, Key, OldVal, NewVal}, UserInfo, WatchId),
-                                Acc2;
+                                execute_callback(CallBack, updated, {NewRecord, Key, OldVal, NewVal}, UserInfo, WatchId, Acc2);
                     ({set_attr, ThisModule, Attr}, Acc2) when ThisModule =:= Module, Attr =:= KeyString ->
-                        execute_callback(CallBack, updated, {NewRecord, Key, OldVal, NewVal}, UserInfo, WatchId),
-                        Acc2;
+                        execute_callback(CallBack, updated, {NewRecord, Key, OldVal, NewVal}, UserInfo, WatchId, Acc2);
                     ({set_attr, ThisModule, "*"}, Acc2) when ThisModule =:= Module ->
-                        execute_callback(CallBack, updated, {NewRecord, Key, OldVal, NewVal}, UserInfo, WatchId),
-                        Acc2;
+                        execute_callback(CallBack, updated, {NewRecord, Key, OldVal, NewVal}, UserInfo, WatchId, Acc2);
                     (_, Acc2) -> Acc2
                 end, Acc1, WatchList).
 
@@ -212,7 +209,7 @@ process_news_state( WatchId, StateAcc, WatchList) ->
 %violates the declared type of field ttl_tree::gb_tree()
 -spec prune_expired_entries(#state{ttl_tree::gb_tree()}) -> #state{ttl_tree::gb_tree()}.
 prune_expired_entries(#state{ ttl_tree = Tree } = State) ->
-    Now                 = boss_news_controller:future_time(0),
+    Now                 = boss_news_controller_util:future_time(0),
     {NewState, NewTree} = tiny_pq:prune_collect_old(fun prune_itterator/2, State, Tree, Now),
     NewState#state{ ttl_tree = NewTree }.
 
@@ -222,3 +219,34 @@ prune_itterator(WatchId, StateAcc) ->
     #watch{ watch_list = WatchList } = dict:fetch(WatchId, StateAcc#state.watch_dict),
     NewState = process_news_state(WatchId, StateAcc, WatchList),
     NewState#state{ watch_dict = dict:erase(WatchId, StateAcc#state.watch_dict) }.
+
+cancel_watch(WatchId, State) ->
+  {RetVal, NewState} = case dict:find(WatchId, State#state.watch_dict) of
+                         {ok, #watch{ exp_time = ExpTime }} ->
+                           NewTree = tiny_pq:move_value(ExpTime, 0, WatchId, State#state.ttl_tree),
+                           {ok, State#state{ ttl_tree = NewTree }};
+                         _ ->
+                           {{error, not_found}, State}
+                       end,
+  {RetVal, boss_news_controller_util:prune_expired_entries(NewState)}.
+
+extend_watch(WatchId, State0) ->
+  State = boss_news_controller_util:prune_expired_entries(State0),
+  WatchF = dict:find(WatchId, State#state.watch_dict),
+  {RetVal, NewState} = case WatchF of
+                         {ok, #watch{ exp_time = ExpTime, ttl = TTL } = Watch} ->
+                           NewExpTime = future_time(TTL),
+                           NewTree    = tiny_pq:move_value(ExpTime, NewExpTime, WatchId, State#state.ttl_tree),
+                           {ok, State#state{
+                             ttl_tree   = NewTree,
+                             watch_dict = dict:store(WatchId,
+                               Watch#watch{ exp_time = NewExpTime },
+                               State#state.watch_dict) }};
+                         _ ->
+                           {{error, not_found}, State}
+                       end,
+  {RetVal, NewState}.
+
+future_time(TTL) ->
+  {MegaSecs, Secs, _} = erlang:now(),
+  MegaSecs * 1000 * 1000 + Secs + TTL.
