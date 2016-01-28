@@ -11,17 +11,6 @@ handle_collection_news(deleted, _, {Prefix, Key}) ->
 handle_collection_news(created, _, {Prefix, Key}) ->
     boss_cache:delete(Prefix, Key),
     {ok, cancel_watch};
-handle_collection_news(updated, {_Record, Attr, _OldVal, _NewVal}, {Prefix, Key}) 
-  when Attr =:= element(5, Key) ->
+handle_collection_news(updated, {_Record, _Attr, _OldVal, _NewVal}, {Prefix, Key}) ->
     boss_cache:delete(Prefix, Key),
-    {ok, cancel_watch};
-handle_collection_news(updated, {_Record, Attr, _OldVal, _NewVal}, {Prefix, Key}) ->
-    Conditions = element(2, Key),
-    case proplists:lookup(Attr, Conditions) of
-        none ->
-            ok;
-        _ ->
-            boss_cache:delete(Prefix, Key),
-            {ok, cancel_watch}
-    end.
-
+    {ok, cancel_watch}.
