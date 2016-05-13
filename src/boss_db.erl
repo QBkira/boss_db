@@ -389,6 +389,10 @@ mock_transaction(TransactionFun) ->
     put(boss_db_transaction_info, undefined),
     poolboy:checkin(?POOLNAME, Worker).
 
+iid(Record) ->
+  [_, StrId] = string:tokens(Record:id(), "-"),
+  list_to_integer(StrId).
+
 to_map(Record) ->
   L = lists:map(fun({AttrName, AttrType})->
     V0 = Record:AttrName(),
@@ -398,7 +402,8 @@ to_map(Record) ->
         end,
     {atom_to_binary(AttrName, utf8), V}
   end, Record:attribute_types()),
-  maps:from_list(L).
+  Id =
+  maps:from_list([{<<"id">>, iid(Record)}]++L).
 
 %% @spec save_record( BossRecord ) -> {ok, SavedBossRecord} | {error, [ErrorMessages]}
 %% @doc Save (that is, create or update) the given BossRecord in the database.
