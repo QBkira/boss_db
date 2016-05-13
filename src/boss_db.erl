@@ -402,7 +402,6 @@ to_map(Record) ->
         end,
     {atom_to_binary(AttrName, utf8), V}
   end, Record:attribute_types()),
-  Id =
   maps:from_list([{<<"id">>, iid(Record)}]++L).
 
 %% @spec save_record( BossRecord ) -> {ok, SavedBossRecord} | {error, [ErrorMessages]}
