@@ -49,6 +49,7 @@
         transaction/1,
         transaction/2,
         mock_transaction/1,
+        to_map/1,
         save_record/1, 
         save_record/2, 
         validate_record/1,
@@ -387,6 +388,17 @@ mock_transaction(TransactionFun) ->
     TransactionFun(),
     put(boss_db_transaction_info, undefined),
     poolboy:checkin(?POOLNAME, Worker).
+
+to_map(Record) ->
+  L = lists:map(fun({AttrName, AttrType})->
+    V0 = Record:AttrName(),
+    V = if
+          AttrType =:= string -> list_to_binary(V0);
+          true -> V0
+        end,
+    {atom_to_binary(AttrName, utf8), V}
+  end, Record:attribute_types()),
+  maps:from_list(L).
 
 %% @spec save_record( BossRecord ) -> {ok, SavedBossRecord} | {error, [ErrorMessages]}
 %% @doc Save (that is, create or update) the given BossRecord in the database.

@@ -237,7 +237,8 @@ make_generated_forms(ModuleName, Parameters, TokenInfo, Attributes,
         counter_incr_forms(Counters)                               ++
         association_forms(ModuleName, Attributes)                  ++
         parameter_getter_forms(Parameters)                         ++
-        deep_get_forms(),
+        deep_get_forms()                                           ++
+        to_map_forms(),
     {ok, GF}.
 
 list_functions(Forms) ->
@@ -792,6 +793,16 @@ counter_name_forms(CounterVariable) ->
             erl_syntax:atom('erlang'),
             erl_syntax:atom('atom_to_list'),
             [erl_syntax:atom(CounterVariable)])).
+
+to_map_forms() ->
+  [erl_syntax:function(
+    erl_syntax:atom(to_map),
+    [erl_syntax:clause([], none,
+      [erl_syntax:application(
+        erl_syntax:atom(?DATABASE_MODULE),
+        erl_syntax:atom(to_map),
+        [erl_syntax:variable("THIS")]
+      )])])].
 
 
 parameter_to_colname(Parameter) when is_atom(Parameter) ->
